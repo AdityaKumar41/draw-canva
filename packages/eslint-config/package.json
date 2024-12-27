@@ -22,5 +22,8 @@
     "globals": "^15.12.0",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.15.0"
+  },
+  "dependencies": {
+    "@repo/eslint-config": "file:"
   }
 }
