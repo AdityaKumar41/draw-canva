@@ -1,5 +1,4 @@
 import { cn } from "../../lib/utils";
-import { IconLayoutNavbarCollapse } from "@tabler/icons-react";
 import {
   AnimatePresence,
   MotionValue,
@@ -8,13 +7,11 @@ import {
   useSpring,
   useTransform,
 } from "framer-motion";
-import { Link } from "react-router-dom";
 import { useRef, useState } from "react";
 
 export const FloatingDock = ({
   items,
   desktopClassName,
-  mobileClassName,
 }: {
   items: { title: string; icon: React.ReactNode; href: string }[];
   desktopClassName?: string;
@@ -55,7 +52,6 @@ function IconContainer({
   mouseX,
   title,
   icon,
-  href,
 }: {
   mouseX: MotionValue;
   title: string;
