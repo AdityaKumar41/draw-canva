@@ -4,7 +4,15 @@ import { TwitterPicker } from "react-color";
 import { useCanvasStore } from "../store/canvasStore";
 
 export function SideMenu() {
-  const { color, lineWidth, setColor, setLineWidth } = useCanvasStore();
+  const {
+    color,
+    lineWidth,
+    setColor,
+    setLineWidth,
+    setEraserWidth,
+    eraserWidth,
+    tool,
+  } = useCanvasStore();
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -12,8 +20,8 @@ export function SideMenu() {
           <SlidersHorizontal color="white" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-80">
-        <div className="grid gap-4 dark:text-white dark:bg-black">
+      <PopoverContent className="w-80 dark:text-white dark:bg-black">
+        <div className="grid gap-4 ">
           <div className="space-y-2">
             <h4 className="font-medium leading-none">Canva Setting</h4>
             <p className="text-sm text-muted-foreground">
@@ -21,20 +29,41 @@ export function SideMenu() {
             </p>
           </div>
           <div className="grid gap-2">
-            <div className="flex justify-between items-center">
-              <p className="text-sm text-muted-foreground">Line Width</p>
-              <p>{lineWidth}</p>
+            <div>
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-muted-foreground">Line Width</p>
+                <p>{lineWidth}</p>
+              </div>
+              <div className="grid grid-cols-3 items-center gap-4 ">
+                <input
+                  type="range"
+                  className="w-52 dark:bg-gray-700 dark:accent-white"
+                  min={0}
+                  max={20}
+                  value={lineWidth}
+                  onChange={(e) => setLineWidth(parseInt(e.target.value))}
+                />
+              </div>
             </div>
-            <div className="grid grid-cols-3 items-center gap-4 ">
-              <input
-                type="range"
-                className="w-52 dark:bg-gray-700 dark:accent-white"
-                min={0}
-                max={20}
-                value={lineWidth}
-                onChange={(e) => setLineWidth(parseInt(e.target.value))}
-              />
-            </div>
+
+            {tool === "eraser" && (
+              <div>
+                <div className="flex justify-between items-center">
+                  <p className="text-sm text-muted-foreground">Eraser Width</p>
+                  <p>{eraserWidth}</p>
+                </div>
+                <div className="grid grid-cols-3 items-center gap-4 ">
+                  <input
+                    type="range"
+                    className="w-52 dark:bg-gray-700 dark:accent-white"
+                    min={0}
+                    max={20}
+                    value={eraserWidth}
+                    onChange={(e) => setEraserWidth(parseInt(e.target.value))}
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="flex flex-col gap-4">
               <p className="text-sm text-muted-foreground">Color</p>

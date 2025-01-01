@@ -13,7 +13,12 @@ export const FloatingDock = ({
   items,
   desktopClassName,
 }: {
-  items: { title: string; icon: React.ReactNode; href: string }[];
+  items: {
+    title: string;
+    icon: React.ReactNode;
+    href: string;
+    onClick: () => void;
+  }[];
   desktopClassName?: string;
   mobileClassName?: string;
 }) => {
@@ -28,7 +33,12 @@ const FloatingDockDesktop = ({
   items,
   className,
 }: {
-  items: { title: string; icon: React.ReactNode; href: string }[];
+  items: {
+    title: string;
+    icon: React.ReactNode;
+    href: string;
+    onClick: () => void;
+  }[];
   className?: string;
 }) => {
   let mouseX = useMotionValue(Infinity);
@@ -42,7 +52,9 @@ const FloatingDockDesktop = ({
       )}
     >
       {items.map((item) => (
-        <IconContainer mouseX={mouseX} key={item.title} {...item} />
+        <div onClick={item.onClick} key={item.title}>
+          <IconContainer mouseX={mouseX} key={item.title} {...item} />
+        </div>
       ))}
     </motion.div>
   );
