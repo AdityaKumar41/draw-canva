@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { ReactSketchCanvasRef } from "react-sketch-canvas";
 import { create } from "zustand";
 import { io, Socket } from "socket.io-client";
+import throttle from 'lodash/throttle';
 
 interface CanvasState {
   // Basic canvas properties
@@ -15,6 +16,7 @@ interface CanvasState {
   socket: Socket | null;
   isDrawing: boolean;
   drawMode: boolean; // Add this to track eraser mode
+  paths: any[];
 
   // Actions
   setColor: (color: string) => void;
@@ -23,6 +25,7 @@ interface CanvasState {
   setEraserWidth: (width: number) => void;
   setImage: (image: string | undefined) => void;
   setIsDrawing: (isDrawing: boolean) => void;
+  setPaths: (paths: any[]) => void;
 
   // Socket actions
   initializeSocket: (roomId: string, canvasRef: ReactSketchCanvasRef) => void;
@@ -44,6 +47,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   socket: null,
   isDrawing: false,
   drawMode: false, // Add this
+  paths: [],
 
   // Basic actions
   setColor: (color) => set({ color }),
@@ -52,79 +56,76 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setEraserWidth: (eraserWidth) => set({ eraserWidth }),
   setImage: (image) => set({ image }),
   setIsDrawing: (isDrawing) => set({ isDrawing }),
+  setPaths: (paths) => set({ paths }),
 
   // Socket actions
   initializeSocket: (roomId: string, canvasRef: ReactSketchCanvasRef) => {
     const socket = io("http://localhost:3000", {
       transports: ["websocket"],
+      reconnectionAttempts: 5,
       reconnectionDelay: 1000,
-      forceNew: true,
+      timeout: 10000,
     });
 
     socket.on("connect", () => {
+      console.log("Connected to server");
       socket.emit("join-room", roomId);
     });
 
-    // Improved canvas state sync
-    socket.on("get-canvas-state", async () => {
-      try {
+    socket.on("connect_error", (error) => {
+      console.error("Connection error:", error);
+      socket.connect();
+    });
+
+    // Handle real-time drawing updates
+    socket.on("draw-path", async (pathData) => {
+      if (canvasRef) {
+        const currentPaths = await canvasRef.exportPaths();
+        currentPaths.push(pathData);
+        canvasRef.loadPaths(currentPaths);
+      }
+    });
+
+    // Handle canvas state sync
+    socket.on("request-canvas-state", async () => {
+      if (canvasRef) {
         const paths = await canvasRef.exportPaths();
-        if (paths) {
-          socket.emit("send-canvas-state", { state: paths, roomId });
+        socket.emit("canvas-state", { roomId, paths });
+      }
+    });
+
+    socket.on("receive-canvas-state", (paths) => {
+      if (canvasRef && paths) {
+        canvasRef.clearCanvas();
+        canvasRef.loadPaths(paths);
+      }
+    });
+
+    socket.on("clear-canvas", () => {
+      if (canvasRef) {
+        canvasRef.clearCanvas();
+      }
+    });
+
+    // Clean up paths periodically to prevent memory buildup
+    const cleanupInterval = setInterval(async () => {
+      if (canvasRef) {
+        const paths = await canvasRef.exportPaths();
+        if (paths.length > 1000) { // Adjust this threshold as needed
+          const recentPaths = paths.slice(-1000);
+          canvasRef.loadPaths(recentPaths);
         }
-      } catch (error) {
-        console.error("Error exporting canvas state:", error);
       }
-    });
-
-    socket.on("receive-canvas-state", (state) => {
-      try {
-        if (state) {
-          canvasRef.loadPaths(state);
-        }
-      } catch (error) {
-        console.error("Error loading canvas state:", error);
-      }
-    });
-
-    socket.on("draw-line", (drawData) => {
-      try {
-        const { color, currentPoint, prevPoint, newlineWidth, isEraser } =
-          drawData;
-        if (!canvasRef || !currentPoint || !prevPoint) return;
-
-        const path = [
-          {
-            drawMode: isEraser,
-            strokeColor: isEraser ? "#ffffff" : color,
-            strokeWidth: isEraser ? newlineWidth * 2 : newlineWidth, // Adjust eraser width for better visibility
-            paths: [prevPoint, currentPoint],
-            op: "draw",
-          },
-        ];
-
-        requestAnimationFrame(() => {
-          if (canvasRef.eraseMode) {
-            canvasRef.eraseMode(isEraser);
-          }
-          canvasRef.loadPaths(path);
-        });
-      } catch (error) {
-        console.error("Error syncing drawing:", error);
-      }
-    });
-
-    socket.on("clearing-canvas", () => {
-      canvasRef.clearCanvas();
-    });
+    }, 30000);
 
     set({ socket });
 
-    // Cleanup function
     return () => {
-      socket.off("get-canvas-state");
+      clearInterval(cleanupInterval);
+      socket.off("draw-path");
+      socket.off("request-canvas-state");
       socket.off("receive-canvas-state");
-      socket.off("draw-line");
+      socket.off("clear-canvas");
       socket.disconnect();
     };
   },
@@ -137,26 +138,23 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     }
   },
 
-  // More efficient drawing emission
-  emitDrawing: (roomId: string, currentPoint, prevPoint) => {
+  // Throttle drawing emissions
+  emitDrawing: throttle((roomId: string, currentPoint: any, prevPoint: any) => {
     const { socket, color, lineWidth, tool, eraserWidth } = get();
     if (!socket || !currentPoint || !prevPoint) return;
 
     const isEraser = tool === "eraser";
-    const drawData = {
-      color: color,
-      currentPoint,
-      prevPoint,
-      newlineWidth: isEraser ? eraserWidth : lineWidth,
-      isEraser,
-      timestamp: Date.now(),
+    const pathData = {
+      drawMode: isEraser,
+      strokeColor: isEraser ? "#ffffff" : color,
+      strokeWidth: isEraser ? eraserWidth : lineWidth,
+      paths: [prevPoint, currentPoint],
+      op: "draw",
+      roomId,
     };
 
-    socket.emit("start-drawing", {
-      roomId,
-      roomDrawLine: drawData,
-    });
-  },
+    socket.volatile.emit("draw-path", { roomId, pathData });
+  }, 16), // Throttle to ~60fps
 }));
 
 export const canvasComponent = () => {

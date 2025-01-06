@@ -4,7 +4,7 @@ import { Server } from "socket.io";
 import http from "http";
 import { activeRoom, addActiveRoom, removeExpiredRooms } from "./data";
 import { DrawLineProps } from "./type";
-import rateLimit from 'express-rate-limit';
+import rateLimit from "express-rate-limit";
 
 const app = express();
 app.use(express.json());
@@ -16,7 +16,7 @@ app.use(cors(options));
 // Add rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100
+  max: 100,
 });
 
 app.use(limiter);
@@ -26,7 +26,7 @@ const io = new Server(server, {
   cors: {
     origin: "http://localhost:5173",
   },
-  transports: ['websocket'],
+  transports: ["websocket"],
   pingInterval: 10000,
   pingTimeout: 5000,
 });
@@ -34,32 +34,54 @@ const io = new Server(server, {
 const connectedUsers = new Map();
 
 io.on("connection", (socket) => {
-  console.log("New client connected");
+  console.log("New client connected", socket.id);
+
+  // Implement connection tracking
+  let lastActivityTime = Date.now();
+
+  const updateActivity = () => {
+    lastActivityTime = Date.now();
+  };
 
   socket.on("join-room", (roomId) => {
+    updateActivity();
+    console.log(`Client ${socket.id} joined room ${roomId}`);
     socket.join(roomId);
     connectedUsers.set(socket.id, roomId);
-    console.log(`User joined room: ${roomId}`);
-    socket.to(roomId).emit("get-canvas-state");
+    // Request canvas state from other users in the room
+    socket.to(roomId).emit("request-canvas-state");
   });
 
-  socket.on("send-canvas-state", ({ state, roomId }) => {
-    console.log(`Sending canvas state to room: ${roomId}`);
-    socket.to(roomId).emit("receive-canvas-state", state);
+  socket.on("canvas-state", ({ roomId, paths }) => {
+    console.log(`Sending canvas state to room ${roomId}`);
+    socket.to(roomId).emit("receive-canvas-state", paths);
   });
 
-  socket.on("start-drawing", ({ roomId, roomDrawLine }, callback) => {
-    socket.to(roomId).volatile.emit("draw-line", roomDrawLine);
-    if (callback) callback();
+  socket.on("draw-path", ({ roomId, pathData }) => {
+    updateActivity();
+    // Only broadcast if the last activity was within 5 minutes
+    if (Date.now() - lastActivityTime < 300000) {
+      console.log(`Drawing in room ${roomId}`);
+      // Use volatile for real-time drawing updates
+      socket.to(roomId).volatile.emit("draw-path", pathData);
+    }
   });
-
-  // setup for eraser
 
   socket.on("clear-canvas", (roomId) => {
-    socket.to(roomId).emit("clearing-canvas");
+    socket.to(roomId).emit("clear-canvas");
   });
 
+  // Implement inactive connection cleanup
+  const activityCheck = setInterval(() => {
+    if (Date.now() - lastActivityTime > 300000) {
+      // 5 minutes
+      socket.disconnect();
+      clearInterval(activityCheck);
+    }
+  }, 60000);
+
   socket.on("disconnect", () => {
+    clearInterval(activityCheck);
     const roomId = connectedUsers.get(socket.id);
     if (roomId) {
       socket.to(roomId).emit("user-disconnected", socket.id);
@@ -70,6 +92,22 @@ io.on("connection", (socket) => {
 
 // Cleanup interval
 setInterval(removeExpiredRooms, 60000);
+
+// Implement memory monitoring
+const memoryCheck = setInterval(() => {
+  const used = process.memoryUsage();
+  if (used.heapUsed > 500 * 1024 * 1024) {
+    // 500MB threshold
+    console.warn("High memory usage detected:", used);
+  }
+}, 300000);
+
+// Clean up on server shutdown
+process.on("SIGTERM", () => {
+  clearInterval(memoryCheck);
+  io.close();
+  server.close();
+});
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
@@ -117,7 +155,7 @@ app.post("/check-room", (req, res) => {
 // Add error handling middleware
 app.use((err: Error, req: any, res: any, next: any) => {
   console.error(err.stack);
-  res.status(500).send('Something broke!');
+  res.status(500).send("Something broke!");
 });
 
 // Don't use app.listen, use server.listen instead

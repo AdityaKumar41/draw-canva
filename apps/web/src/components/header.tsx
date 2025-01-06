@@ -24,7 +24,7 @@ const Header = ({
       {/* <div>
         <h1 className="text-2xl font-bold text-white">Whiteboard</h1>
       </div> */}
-      <div className="flex space-x-4 items-center">
+      <div className="flex space-x-4 items-center z-10">
         <button
           className="bg-white border border-gray-700 p-2 rounded-md dark:bg-[#212121] dark:border-gray-700"
           onClick={handleExport}

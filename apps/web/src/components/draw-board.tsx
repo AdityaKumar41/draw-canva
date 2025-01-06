@@ -33,27 +33,33 @@ const DrawBoard = ({ roomId }: { roomId?: string }) => {
   useEffect(() => {
     if (roomId && canvasRef.current) {
       initializeSocket(roomId, canvasRef.current);
-      return () => disconnectSocket();
+      const cleanup = () => {};
+      return () => {
+        cleanup();
+        disconnectSocket();
+      };
     }
-  }, [roomId]);
+  }, [roomId, canvasRef]);
 
   const handleStroke = useCallback(
-    (paths: CanvasPath[]) => {
+    async (paths: CanvasPath[]) => {
       if (!roomId || !paths.length) return;
 
       const currentPath = paths[paths.length - 1];
       if (!currentPath?.paths?.length) return;
 
-      // Send all points in the current path for smoother drawing
-      currentPath.paths.forEach((point, index) => {
-        if (index === 0) {
-          prevPoint.current = point;
-          return;
-        }
+      // Send points in pairs for smoother drawing
+      for (let i = 1; i < currentPath.paths.length; i++) {
+        const prevPoint = currentPath.paths[i - 1];
+        const currentPoint = currentPath.paths[i];
+        emitDrawing(roomId, currentPoint, prevPoint);
+      }
 
-        emitDrawing(roomId, point, prevPoint.current!);
-        prevPoint.current = point;
-      });
+      // Update local paths
+      if (canvasRef.current) {
+        const currentPaths = await canvasRef.current.exportPaths();
+        useCanvasStore.getState().setPaths(currentPaths);
+      }
     },
     [roomId, emitDrawing]
   );
@@ -72,7 +78,7 @@ const DrawBoard = ({ roomId }: { roomId?: string }) => {
 
   // Update the way we handle drawing mode
   const isEraser = tool === "eraser";
-  
+
   return (
     <div className="relative w-full h-full">
       <ReactSketchCanvas
