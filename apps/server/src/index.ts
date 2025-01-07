@@ -8,15 +8,28 @@ import rateLimit from "express-rate-limit";
 
 const app = express();
 app.use(express.json());
+
+// Add production security headers middleware
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  next();
+});
+
 const options: cors.CorsOptions = {
-  origin: ["http://localhost:5173"],
+  origin: process.env.ALLOWED_ORIGIN || "http://localhost:5173",
+  credentials: true,
+  methods: ['GET', 'POST'],
 };
 app.use(cors(options));
 
-// Add rate limiting
+// Update rate limiting for production
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: process.env.NODE_ENV === 'production' ? 50 : 100,
+  message: 'Too many requests from this IP, please try again later.'
 });
 
 app.use(limiter);
@@ -24,11 +37,12 @@ app.use(limiter);
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: process.env.ALLOWED_ORIGIN || "http://localhost:5173",
+    credentials: true,
   },
   transports: ["websocket"],
-  pingInterval: 10000,
-  pingTimeout: 5000,
+  pingInterval: 20000,
+  pingTimeout: 10000,
 });
 
 const connectedUsers = new Map();
@@ -158,7 +172,18 @@ app.use((err: Error, req: any, res: any, next: any) => {
   res.status(500).send("Something broke!");
 });
 
+// Add server-side logging
+const logger = {
+  error: (message: string, ...args: any[]) => {
+    console.error(new Date().toISOString(), 'ERROR:', message, ...args);
+  },
+  info: (message: string, ...args: any[]) => {
+    console.log(new Date().toISOString(), 'INFO:', message, ...args);
+  }
+};
+
 // Don't use app.listen, use server.listen instead
-server.listen(3000, () => {
-  console.log("Server is running on port 3000");
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  logger.info(`Server is running on port ${PORT}`);
 });

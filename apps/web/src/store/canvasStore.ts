@@ -60,11 +60,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   // Socket actions
   initializeSocket: (roomId: string, canvasRef: ReactSketchCanvasRef) => {
-    const socket = io("http://localhost:3000", {
+    const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
+    const socket = io(SOCKET_URL, {
       transports: ["websocket"],
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      timeout: 10000,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 2000,
+      timeout: 20000,
+      withCredentials: true,
     });
 
     socket.on("connect", () => {
@@ -74,7 +76,11 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
     socket.on("connect_error", (error) => {
       console.error("Connection error:", error);
-      socket.connect();
+      setTimeout(() => socket.connect(), 5000);
+    });
+
+    socket.on("error", (error) => {
+      console.error("Socket error:", error);
     });
 
     // Handle real-time drawing updates
@@ -110,13 +116,17 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     // Clean up paths periodically to prevent memory buildup
     const cleanupInterval = setInterval(async () => {
       if (canvasRef) {
-        const paths = await canvasRef.exportPaths();
-        if (paths.length > 1000) { // Adjust this threshold as needed
-          const recentPaths = paths.slice(-1000);
-          canvasRef.loadPaths(recentPaths);
+        try {
+          const paths = await canvasRef.exportPaths();
+          if (paths.length > 2000) { // Adjust this threshold as needed
+            const recentPaths = paths.slice(-2000);
+            await canvasRef.loadPaths(recentPaths);
+          }
+        } catch (error) {
+          console.error("Cleanup error:", error);
         }
       }
-    }, 30000);
+    }, 60000);
 
     set({ socket });
 

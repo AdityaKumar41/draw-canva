@@ -48,17 +48,19 @@ const DrawBoard = ({ roomId }: { roomId?: string }) => {
       const currentPath = paths[paths.length - 1];
       if (!currentPath?.paths?.length) return;
 
-      // Send points in pairs for smoother drawing
-      for (let i = 1; i < currentPath.paths.length; i++) {
+      // Only send every other point to reduce network traffic
+      for (let i = 1; i < currentPath.paths.length; i += 2) {
         const prevPoint = currentPath.paths[i - 1];
         const currentPoint = currentPath.paths[i];
         emitDrawing(roomId, currentPoint, prevPoint);
       }
 
-      // Update local paths
-      if (canvasRef.current) {
-        const currentPaths = await canvasRef.current.exportPaths();
-        useCanvasStore.getState().setPaths(currentPaths);
+      // Limit stored paths
+      if (paths.length > 1000) {
+        const recentPaths = paths.slice(-1000);
+        if (canvasRef.current) {
+          canvasRef.current.loadPaths(recentPaths);
+        }
       }
     },
     [roomId, emitDrawing]
