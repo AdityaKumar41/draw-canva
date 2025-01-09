@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "build/index.js",
   "scripts": {
-    "dev": "tsc -b && node build/index.js"
+    "build": "tsc -b",
+    "dev": "tsc -b && node build/index.js",
+    "start": "node build/index.js"
   },
   "keywords": [],
   "author": "",

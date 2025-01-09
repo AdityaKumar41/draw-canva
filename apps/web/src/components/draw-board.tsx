@@ -19,8 +19,8 @@ const DrawBoard = ({ roomId }: { roomId?: string }) => {
   } = useCanvasStore();
 
   const canvasRef = useRef<ReactSketchCanvasRef>(null);
-  const prevPoint = useRef<{ x: number; y: number } | null>(null);
-  const isDrawingRef = useRef(false);
+  // const prevPoint = useRef<{ x: number; y: number } | null>(null);
+  // const isDrawingRef = useRef(false);
 
   useEffect(() => {
     if (tool === "eraser") {

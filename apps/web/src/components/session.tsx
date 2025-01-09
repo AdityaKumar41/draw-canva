@@ -1,11 +1,8 @@
 import { Copy, Radio } from "lucide-react";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
-  DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "./ui/dialog-ui";
