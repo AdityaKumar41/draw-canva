@@ -2,7 +2,6 @@ import { useRef } from "react";
 import { ReactSketchCanvasRef } from "react-sketch-canvas";
 import { create } from "zustand";
 import { io, Socket } from "socket.io-client";
-import throttle from 'lodash/throttle';
 
 interface CanvasState {
   // Basic canvas properties
@@ -148,8 +147,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     }
   },
 
-  // Throttle drawing emissions
-  emitDrawing: throttle((roomId: string, currentPoint: any, prevPoint: any) => {
+  // Directly emit drawing without throttle
+  emitDrawing: (roomId: string, currentPoint: any, prevPoint: any) => {
     const { socket, color, lineWidth, tool, eraserWidth } = get();
     if (!socket || !currentPoint || !prevPoint) return;
 
@@ -164,7 +163,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     };
 
     socket.volatile.emit("draw-path", { roomId, pathData });
-  }, 16), // Throttle to ~60fps
+  },
 }));
 
 export const canvasComponent = () => {

@@ -1,4 +1,6 @@
 lockfileVersion: '9.0'
+# Ensure the lockfile matches the package.json dependencies
+# Update the lockfile by running `pnpm install` locally
 
 settings:
   autoInstallPeers: true
